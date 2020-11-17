@@ -198,7 +198,7 @@ public class Selector implements Selectable {
         socket.setTcpNoDelay(true);
         boolean connected;
         try {
-            //同步等待连接结果
+            //如果是非阻塞直接返回false，否则同步等待连接结果
             connected = socketChannel.connect(address);
         } catch (UnresolvedAddressException e) {
             socketChannel.close();
@@ -207,14 +207,16 @@ public class Selector implements Selectable {
             socketChannel.close();
             throw e;
         }
-        //将这个channel与SelectionKey关联
+        //将这个channel与SelectionKey关联，监听OP_CONNECT事件
         SelectionKey key = socketChannel.register(nioSelector, SelectionKey.OP_CONNECT);
         KafkaChannel channel = channelBuilder.buildChannel(id, key, maxReceiveSize);
+        //将channel与key绑定
         key.attach(channel);
         this.channels.put(id, channel);
 
         if (connected) {
             // OP_CONNECT won't trigger for immediately connected channels
+            //立即连接完毕的话是不会触发连接成功事件的，所以需要将key存储到immediatelyConnectedKeys中
             log.debug("Immediately connected to node {}", channel.id());
             immediatelyConnectedKeys.add(key);
             key.interestOps(0);
