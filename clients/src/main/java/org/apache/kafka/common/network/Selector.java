@@ -169,10 +169,12 @@ public class Selector implements Selectable {
         if (this.channels.containsKey(id)) {
             throw new IllegalStateException("There is already a connection for id " + id);
         }
-
+        //基于Java NIO
         SocketChannel socketChannel = SocketChannel.open();
+        //非阻塞
         socketChannel.configureBlocking(false);
         Socket socket = socketChannel.socket();
+        //keepAlive
         socket.setKeepAlive(true);
         //设置发送BufferSize
         if (sendBufferSize != Selectable.USE_DEFAULT_BUFFER_SIZE) {
@@ -183,9 +185,20 @@ public class Selector implements Selectable {
             socket.setReceiveBufferSize(receiveBufferSize);
         }
         //设置NoDelay为true
+        /**
+         * TCP/IP协议中针对TCP默认开启了Nagle算法。Nagle算法通过减少需要传输的数据包，来优化网络。在内核实现中，数据包的发送和接受会先做缓存，分别对应于写缓存和读缓存。
+
+         启动TCP_NODELAY，就意味着禁用了Nagle算法，允许小包的发送。对于延时敏感型，同时数据传输量比较小的应用，开启TCP_NODELAY选项无疑是一个正确的选择。比如，对于SSH会话，用户在远程敲击键盘发出指令的速度相对于网络带宽能力来说，绝对不是在一个量级上的，所以数据传输非常少；而又要求用户的输入能够及时获得返回，有较低的延时。如果开启了Nagle算法，就很可能出现频繁的延时，导致用户体验极差。当然，你也可以选择在应用层进行buffer，比如使用java中的buffered stream，尽可能地将大包写入到内核的写缓存进行发送；vectored I/O（writev接口）也是个不错的选择。
+
+
+         对于关闭TCP_NODELAY，则是应用了Nagle算法。数据只有在写缓存中累积到一定量之后，才会被发送出去，这样明显提高了网络利用率（实际传输数据payload与协议头的比例大大提高）。但是这又不可避免地增加了延时；与TCP delayed ack这个特性结合，这个问题会更加显著，延时基本在40ms左右。当然这个问题只有在连续进行两次写操作的时候，才会暴露出来。
+
+         连续进行多次对小数据包的写操作，然后进行读操作，本身就不是一个好的网络编程模式；在应用层就应该进行优化
+         * */
         socket.setTcpNoDelay(true);
         boolean connected;
         try {
+            //同步等待连接结果
             connected = socketChannel.connect(address);
         } catch (UnresolvedAddressException e) {
             socketChannel.close();
