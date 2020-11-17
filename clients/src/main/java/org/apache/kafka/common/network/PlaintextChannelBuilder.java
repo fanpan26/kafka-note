@@ -35,10 +35,13 @@ public class PlaintextChannelBuilder implements ChannelBuilder {
         }
     }
 
+    @Override
     public KafkaChannel buildChannel(String id, SelectionKey key, int maxReceiveSize) throws KafkaException {
         KafkaChannel channel = null;
         try {
+            //SelectionKey封装到TransportLayer中
             PlaintextTransportLayer transportLayer = new PlaintextTransportLayer(key);
+            //认证
             Authenticator authenticator = new DefaultAuthenticator();
             authenticator.configure(transportLayer, this.principalBuilder, this.configs);
             channel = new KafkaChannel(id, transportLayer, authenticator, maxReceiveSize);
@@ -49,6 +52,7 @@ public class PlaintextChannelBuilder implements ChannelBuilder {
         return channel;
     }
 
+    @Override
     public void close() {
         this.principalBuilder.close();
     }
