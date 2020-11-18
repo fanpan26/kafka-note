@@ -376,6 +376,7 @@ public class Selector implements Selectable {
                 /* if channel is ready write to any sockets that have space in their buffer and for which we have data */
                 //如果可写的话，就讲数据组装成Send对象，并加入到 completedSends中去
                 if (channel.ready() && key.isWritable()) {
+                    //OP_WRITE
                     Send send = channel.write();
                     if (send != null) {
                         this.completedSends.add(send);

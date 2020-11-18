@@ -157,6 +157,7 @@ public class PlaintextTransportLayer implements TransportLayer {
     */
     @Override
     public long write(ByteBuffer[] srcs) throws IOException {
+        //最终还是调用socketChannel的write方法
         return socketChannel.write(srcs);
     }
 

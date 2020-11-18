@@ -161,8 +161,13 @@ public class KafkaChannel {
         return receive.readFrom(transportLayer);
     }
 
+    /**
+     * 发送数据，底层是SocketChannel.write方法
+     */
     private boolean send(Send send) throws IOException {
+        //写入到transportLayer
         send.writeTo(transportLayer);
+        //如果发送完成，则移除OP_WRITE Key
         if (send.completed()) {
             transportLayer.removeInterestOps(SelectionKey.OP_WRITE);
         }

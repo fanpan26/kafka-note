@@ -22,6 +22,9 @@ import java.nio.channels.GatheringByteChannel;
  */
 public class ByteBufferSend implements Send {
 
+    /**
+     * NodeId
+     * */
     private final String destination;
     private final int size;
     protected final ByteBuffer[] buffers;
@@ -44,6 +47,7 @@ public class ByteBufferSend implements Send {
 
     @Override
     public boolean completed() {
+        //所有数据是否已经发送完毕
         return remaining <= 0 && !pending;
     }
 
@@ -55,14 +59,17 @@ public class ByteBufferSend implements Send {
     @Override
     public long writeTo(GatheringByteChannel channel) throws IOException {
         long written = channel.write(buffers);
-        if (written < 0)
+        if (written < 0) {
             throw new EOFException("Wrote negative bytes to channel. This shouldn't happen.");
+        }
+        //剩余未发送的数据减去已经发送的数据
         remaining -= written;
         // This is temporary workaround. As Send , Receive interfaces are being used by BlockingChannel.
         // Once BlockingChannel is removed we can make Send, Receive to work with transportLayer rather than
         // GatheringByteChannel or ScatteringByteChannel.
-        if (channel instanceof TransportLayer)
+        if (channel instanceof TransportLayer) {
             pending = ((TransportLayer) channel).hasPendingWrites();
+        }
 
         return written;
     }

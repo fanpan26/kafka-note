@@ -277,15 +277,27 @@ public class NetworkClient implements KafkaClient {
 
         // process completed actions
         long updatedNow = this.time.milliseconds();
+        //响应列表
         List<ClientResponse> responses = new ArrayList<>();
+
+        //处理发送完成的请求
         handleCompletedSends(responses, updatedNow);
+
+        //处理接收完成的响应
         handleCompletedReceives(responses, updatedNow);
+
+        //处理断开的链接
         handleDisconnections(responses, updatedNow);
+
+        //处理连接
         handleConnections();
+
+        //处理超时的请求
         handleTimedOutRequests(responses, updatedNow);
 
         // invoke callbacks
         for (ClientResponse response : responses) {
+            //如果有回调对象，则执行回调方法
             if (response.request().hasCallback()) {
                 try {
                     response.request().callback().onComplete(response);
@@ -442,8 +454,11 @@ public class NetworkClient implements KafkaClient {
         // if no response is expected then when the send is completed, return it
         for (Send send : this.selector.completedSends()) {
             ClientRequest request = this.inFlightRequests.lastSent(send.destination());
+            //如果此请求不期待响应，则直接认为是处理完成
             if (!request.expectResponse()) {
+                //更新上次发送
                 this.inFlightRequests.completeLastSent(send.destination());
+                //添加响应，responseBody为 null
                 responses.add(new ClientResponse(request, now, false, null));
             }
         }
