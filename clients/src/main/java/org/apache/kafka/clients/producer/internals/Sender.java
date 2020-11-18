@@ -202,16 +202,17 @@ public class Sender implements Runnable {
         if (guaranteeMessageOrder) {
             // Mute all the partitions drained
             for (List<RecordBatch> batchList : batches.values()) {
-                for (RecordBatch batch : batchList)
+                for (RecordBatch batch : batchList) {
                     this.accumulator.mutePartition(batch.topicPartition);
+                }
             }
         }
 
         List<RecordBatch> expiredBatches = this.accumulator.abortExpiredBatches(this.requestTimeout, now);
         // update sensors
-        for (RecordBatch expiredBatch : expiredBatches)
+        for (RecordBatch expiredBatch : expiredBatches) {
             this.sensors.recordErrors(expiredBatch.topicPartition.topic(), expiredBatch.recordCount);
-
+        }
         sensors.updateProduceRequestMetrics(batches);
         List<ClientRequest> requests = createProduceRequests(batches, now);
         // If we have any nodes that are ready to send + have sendable data, poll with 0 timeout so this can immediately
@@ -224,8 +225,9 @@ public class Sender implements Runnable {
             log.trace("Created {} produce requests: {}", requests.size(), requests);
             pollTimeout = 0;
         }
-        for (ClientRequest request : requests)
+        for (ClientRequest request : requests) {
             client.send(request, now);
+        }
 
         // if some partitions are already ready to be sent, the select time would be 0;
         // otherwise if some partition already has some data accumulated but not ready yet,

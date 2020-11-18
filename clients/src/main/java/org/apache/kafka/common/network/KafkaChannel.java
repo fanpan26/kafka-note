@@ -58,10 +58,12 @@ public class KafkaChannel {
      * Does handshake of transportLayer and authentication using configured authenticator
      */
     public void prepare() throws IOException {
-        if (!transportLayer.ready())
+        if (!transportLayer.ready()) {
             transportLayer.handshake();
-        if (transportLayer.ready() && !authenticator.complete())
+        }
+        if (transportLayer.ready() && !authenticator.complete()) {
             authenticator.authenticate();
+        }
     }
 
     public void disconnect() {
@@ -94,6 +96,7 @@ public class KafkaChannel {
     }
 
     public boolean ready() {
+        //PlaintextTransportLayer 默认为true DefaultAuthenticator  默认为true
         return transportLayer.ready() && authenticator.complete();
     }
 

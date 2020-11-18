@@ -377,9 +377,10 @@ public final class RecordAccumulator {
                                                  Set<Node> nodes,
                                                  int maxSize,
                                                  long now) {
-        if (nodes.isEmpty())
+        //如果没有准备好的节点，直接返回空
+        if (nodes.isEmpty()) {
             return Collections.emptyMap();
-
+        }
         Map<Integer, List<RecordBatch>> batches = new HashMap<>();
         for (Node node : nodes) {
             int size = 0;

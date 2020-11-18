@@ -301,13 +301,15 @@ public class Selector implements Selectable {
      */
     @Override
     public void poll(long timeout) throws IOException {
-        if (timeout < 0)
+        if (timeout < 0) {
             throw new IllegalArgumentException("timeout should be >= 0");
-
+        }
+        //每次poll之前，清空所有的缓存数据
         clear();
 
-        if (hasStagedReceives() || !immediatelyConnectedKeys.isEmpty())
+        if (hasStagedReceives() || !immediatelyConnectedKeys.isEmpty()) {
             timeout = 0;
+        }
 
         /* check ready keys */
         long startSelect = time.nanoseconds();
@@ -333,35 +335,45 @@ public class Selector implements Selectable {
         while (iterator.hasNext()) {
             SelectionKey key = iterator.next();
             iterator.remove();
+            //key.attachment() 将 KafkaChannel从 attachment 拿出来
             KafkaChannel channel = channel(key);
 
             // register all per-connection metrics at once
             sensors.maybeRegisterConnectionMetrics(channel.id());
+            //采用LRU算法保存当前连接
             lruConnections.put(channel.id(), currentTimeNanos);
 
             try {
 
                 /* complete any connections that have finished their handshake (either normally or immediately) */
+                //可连接的，要完成连接
                 if (isImmediatelyConnected || key.isConnectable()) {
                     if (channel.finishConnect()) {
                         this.connected.add(channel.id());
                         this.sensors.connectionCreated.record();
-                    } else
+                    } else {
                         continue;
+                    }
                 }
 
                 /* if channel is not ready finish prepare */
-                if (channel.isConnected() && !channel.ready())
+                if (channel.isConnected() && !channel.ready()) {
+                    //握手或者完成认证
                     channel.prepare();
+                }
 
                 /* if channel is ready read from any connections that have readable data */
+                //channel有数据响应，可读，读取转化为  NetworkReceive 对象
                 if (channel.ready() && key.isReadable() && !hasStagedReceive(channel)) {
                     NetworkReceive networkReceive;
-                    while ((networkReceive = channel.read()) != null)
+                    while ((networkReceive = channel.read()) != null) {
+                        //添加到一个Deque中去
                         addToStagedReceives(channel, networkReceive);
+                    }
                 }
 
                 /* if channel is ready write to any sockets that have space in their buffer and for which we have data */
+                //如果可写的话，就讲数据组装成Send对象，并加入到 completedSends中去
                 if (channel.ready() && key.isWritable()) {
                     Send send = channel.write();
                     if (send != null) {
@@ -371,6 +383,7 @@ public class Selector implements Selectable {
                 }
 
                 /* cancel any defunct sockets */
+                //如果key已经非正常状态了，直接关闭Channel，并将连接加入到disconnected中去
                 if (!key.isValid()) {
                     close(channel);
                     this.disconnected.add(channel.id());
@@ -378,10 +391,11 @@ public class Selector implements Selectable {
 
             } catch (Exception e) {
                 String desc = channel.socketDescription();
-                if (e instanceof IOException)
+                if (e instanceof IOException) {
                     log.debug("Connection with {} disconnected", desc, e);
-                else
+                } else {
                     log.warn("Unexpected error from {}; closing connection", desc, e);
+                }
                 close(channel);
                 this.disconnected.add(channel.id());
             }
@@ -440,6 +454,9 @@ public class Selector implements Selectable {
             unmute(channel);
     }
 
+    /**
+     * LRU 清除无用连接
+     * */
     private void maybeCloseOldestConnection() {
         if (currentTimeNanos > nextIdleCloseCheckTime) {
             if (lruConnections.isEmpty()) {
@@ -448,12 +465,13 @@ public class Selector implements Selectable {
                 Map.Entry<String, Long> oldestConnectionEntry = lruConnections.entrySet().iterator().next();
                 Long connectionLastActiveTime = oldestConnectionEntry.getValue();
                 nextIdleCloseCheckTime = connectionLastActiveTime + connectionsMaxIdleNanos;
+                //当前时间已经大于下次检查是否关闭连接的时间，则关掉该连接
                 if (currentTimeNanos > nextIdleCloseCheckTime) {
                     String connectionId = oldestConnectionEntry.getKey();
-                    if (log.isTraceEnabled())
+                    if (log.isTraceEnabled()) {
                         log.trace("About to close the idle connection from " + connectionId
                                 + " due to being idle for " + (currentTimeNanos - connectionLastActiveTime) / 1000 / 1000 + " millis");
-
+                    }
                     disconnected.add(connectionId);
                     close(connectionId);
                 }
@@ -566,8 +584,9 @@ public class Selector implements Selectable {
      */
     private boolean hasStagedReceives() {
         for (KafkaChannel channel : this.stagedReceives.keySet()) {
-            if (!channel.isMute())
+            if (!channel.isMute()) {
                 return true;
+            }
         }
         return false;
     }
@@ -577,9 +596,9 @@ public class Selector implements Selectable {
      * adds a receive to staged receives
      */
     private void addToStagedReceives(KafkaChannel channel, NetworkReceive receive) {
-        if (!stagedReceives.containsKey(channel))
+        if (!stagedReceives.containsKey(channel)) {
             stagedReceives.put(channel, new ArrayDeque<NetworkReceive>());
-
+        }
         Deque<NetworkReceive> deque = stagedReceives.get(channel);
         deque.add(receive);
     }
@@ -589,17 +608,18 @@ public class Selector implements Selectable {
      */
     private void addToCompletedReceives() {
         if (!this.stagedReceives.isEmpty()) {
-            Iterator<Map.Entry<KafkaChannel, Deque<NetworkReceive>>> iter = this.stagedReceives.entrySet().iterator();
-            while (iter.hasNext()) {
-                Map.Entry<KafkaChannel, Deque<NetworkReceive>> entry = iter.next();
+            Iterator<Map.Entry<KafkaChannel, Deque<NetworkReceive>>> iterator = this.stagedReceives.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<KafkaChannel, Deque<NetworkReceive>> entry = iterator.next();
                 KafkaChannel channel = entry.getKey();
                 if (!channel.isMute()) {
                     Deque<NetworkReceive> deque = entry.getValue();
                     NetworkReceive networkReceive = deque.poll();
                     this.completedReceives.add(networkReceive);
                     this.sensors.recordBytesReceived(channel.id(), networkReceive.payload().limit());
-                    if (deque.isEmpty())
-                        iter.remove();
+                    if (deque.isEmpty()) {
+                        iterator.remove();
+                    }
                 }
             }
         }
