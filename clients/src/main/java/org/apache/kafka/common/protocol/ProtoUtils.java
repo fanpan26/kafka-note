@@ -24,13 +24,16 @@ import org.apache.kafka.common.protocol.types.Struct;
 public class ProtoUtils {
 
     private static Schema schemaFor(Schema[][] schemas, int apiKey, int version) {
-        if (apiKey < 0 || apiKey > schemas.length)
+        if (apiKey < 0 || apiKey > schemas.length) {
             throw new IllegalArgumentException("Invalid api key: " + apiKey);
+        }
         Schema[] versions = schemas[apiKey];
-        if (version < 0 || version > latestVersion(apiKey))
+        if (version < 0 || version > latestVersion(apiKey)) {
             throw new IllegalArgumentException("Invalid version for API key " + apiKey + ": " + version);
-        if (versions[version] == null)
+        }
+        if (versions[version] == null) {
             throw new IllegalArgumentException("Unsupported version for API key " + apiKey + ": " + version);
+        }
         return versions[version];
     }
 

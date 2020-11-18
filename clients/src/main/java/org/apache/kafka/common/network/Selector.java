@@ -264,6 +264,7 @@ public class Selector implements Selectable {
      * Queue the given request for sending in the subsequent {@link #poll(long)} calls
      * @param send The request to send
      */
+    @Override
     public void send(Send send) {
         KafkaChannel channel = channelOrFail(send.destination());
         try {
@@ -545,8 +546,9 @@ public class Selector implements Selectable {
 
     private KafkaChannel channelOrFail(String id) {
         KafkaChannel channel = this.channels.get(id);
-        if (channel == null)
+        if (channel == null) {
             throw new IllegalStateException("Attempt to retrieve channel for which there is no open connection. Connection id " + id + " existing connections " + channels.keySet());
+        }
         return channel;
     }
 

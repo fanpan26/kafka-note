@@ -125,6 +125,7 @@ public class Sender implements Runnable {
     /**
      * The main run loop for the sender thread
      */
+    @Override
     public void run() {
         log.debug("Starting Kafka producer I/O thread.");
 
@@ -194,7 +195,7 @@ public class Sender implements Runnable {
             }
         }
 
-        // create produce requests
+        //create produce requests
         Map<Integer, List<RecordBatch>> batches = this.accumulator.drain(cluster,
                                                                          result.readyNodes,
                                                                          this.maxRequestSize,
@@ -214,6 +215,8 @@ public class Sender implements Runnable {
             this.sensors.recordErrors(expiredBatch.topicPartition.topic(), expiredBatch.recordCount);
         }
         sensors.updateProduceRequestMetrics(batches);
+
+        //包装ClientRequest
         List<ClientRequest> requests = createProduceRequests(batches, now);
         // If we have any nodes that are ready to send + have sendable data, poll with 0 timeout so this can immediately
         // loop and try sending more data. Otherwise, the timeout is determined by nodes that have partitions with data
@@ -225,6 +228,7 @@ public class Sender implements Runnable {
             log.trace("Created {} produce requests: {}", requests.size(), requests);
             pollTimeout = 0;
         }
+        //遍历ClientRequest 发送消息
         for (ClientRequest request : requests) {
             client.send(request, now);
         }
@@ -340,8 +344,10 @@ public class Sender implements Runnable {
      */
     private List<ClientRequest> createProduceRequests(Map<Integer, List<RecordBatch>> collated, long now) {
         List<ClientRequest> requests = new ArrayList<ClientRequest>(collated.size());
-        for (Map.Entry<Integer, List<RecordBatch>> entry : collated.entrySet())
+        //遍历每个Node
+        for (Map.Entry<Integer, List<RecordBatch>> entry : collated.entrySet()) {
             requests.add(produceRequest(now, entry.getKey(), acks, requestTimeout, entry.getValue()));
+        }
         return requests;
     }
 
@@ -357,15 +363,19 @@ public class Sender implements Runnable {
             recordsByPartition.put(tp, batch);
         }
         ProduceRequest request = new ProduceRequest(acks, timeout, produceRecordsByPartition);
+
+        //将header和body写入到buffer中
         RequestSend send = new RequestSend(Integer.toString(destination),
                                            this.client.nextRequestHeader(ApiKeys.PRODUCE),
                                            request.toStruct());
+        //回调对象
         RequestCompletionHandler callback = new RequestCompletionHandler() {
+            @Override
             public void onComplete(ClientResponse response) {
                 handleProduceResponse(response, recordsByPartition, time.milliseconds());
             }
         };
-
+        //返回ClientRequest
         return new ClientRequest(now, acks != 0, send, callback);
     }
 

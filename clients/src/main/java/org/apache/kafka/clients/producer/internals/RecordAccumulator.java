@@ -384,6 +384,7 @@ public final class RecordAccumulator {
         Map<Integer, List<RecordBatch>> batches = new HashMap<>();
         for (Node node : nodes) {
             int size = 0;
+            //获取broker的所有Partition信息
             List<PartitionInfo> parts = cluster.partitionsForNode(node.id());
             List<RecordBatch> ready = new ArrayList<>();
             /* to make starvation less likely this loop doesn't start at 0 */
@@ -405,6 +406,7 @@ public final class RecordAccumulator {
                                         // there is a rare case that a single batch size is larger than the request size due
                                         // to compression; in this case we will still eventually send this batch in a single
                                         // request
+                                        //如果发送的字节数超过最大发送字节数，跳过，让他下一次在发送
                                         break;
                                     } else {
                                         RecordBatch batch = deque.pollFirst();
@@ -420,6 +422,7 @@ public final class RecordAccumulator {
                 }
                 this.drainIndex = (this.drainIndex + 1) % parts.size();
             } while (start != drainIndex);
+            //每个Node对应的List<RecordBatch>
             batches.put(node.id(), ready);
         }
         return batches;

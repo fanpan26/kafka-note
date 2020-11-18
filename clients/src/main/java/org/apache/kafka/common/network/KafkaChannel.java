@@ -116,15 +116,19 @@ public class KafkaChannel {
 
     public String socketDescription() {
         Socket socket = transportLayer.socketChannel().socket();
-        if (socket.getInetAddress() == null)
+        if (socket.getInetAddress() == null) {
             return socket.getLocalAddress().toString();
+        }
         return socket.getInetAddress().toString();
     }
 
     public void setSend(Send send) {
-        if (this.send != null)
+        //如果上一个正在发送，抛出异常
+        if (this.send != null) {
             throw new IllegalStateException("Attempt to begin a send operation with prior send operation still in progress.");
+        }
         this.send = send;
+        //添加感兴趣的事件：OP_WRITE,说明此Channel进入可写状态
         this.transportLayer.addInterestOps(SelectionKey.OP_WRITE);
     }
 
@@ -159,9 +163,9 @@ public class KafkaChannel {
 
     private boolean send(Send send) throws IOException {
         send.writeTo(transportLayer);
-        if (send.completed())
+        if (send.completed()) {
             transportLayer.removeInterestOps(SelectionKey.OP_WRITE);
-
+        }
         return send.completed();
     }
 
