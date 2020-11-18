@@ -40,3 +40,10 @@ tests/.ducktape
 .cache
 
 docs/generated/
+clients/out/test/resources/log4j.properties
+clients/out/test/resources/serializedData/offsetAndMetadataSerializedfile
+clients/out/test/resources/serializedData/topicPartitionSerializedfile
+connect/runtime/out/test/resources/log4j.properties
+core/out/test/resources/log4j.properties
+core/out/test/resources/minikdc-krb5.conf
+core/out/test/resources/minikdc.ldiff
