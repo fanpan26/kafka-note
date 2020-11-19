@@ -19,11 +19,34 @@ import org.apache.kafka.common.requests.RequestSend;
  */
 public final class ClientRequest {
 
+    /**
+     * 创建时间
+     * */
     private final long createdTimeMs;
+
+    /**
+     * 是否有响应
+     * */
     private final boolean expectResponse;
+
+    /**
+     * 请求包
+     * */
     private final RequestSend request;
+
+    /**
+     * 回调
+     * */
     private final RequestCompletionHandler callback;
+
+    /**
+     * 是否由NetworkClient初始化
+     * */
     private final boolean isInitiatedByNetworkClient;
+
+    /**
+     * 发送时间
+     * */
     private long sendTimeMs;
 
     /**
