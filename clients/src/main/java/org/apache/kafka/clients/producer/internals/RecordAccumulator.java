@@ -361,8 +361,9 @@ public final class RecordAccumulator {
         for (Map.Entry<TopicPartition, Deque<RecordBatch>> entry : this.batches.entrySet()) {
             Deque<RecordBatch> deque = entry.getValue();
             synchronized (deque) {
-                if (!deque.isEmpty())
+                if (!deque.isEmpty()) {
                     return true;
+                }
             }
         }
         return false;

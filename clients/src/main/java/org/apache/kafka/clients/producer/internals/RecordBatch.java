@@ -144,16 +144,21 @@ public final class RecordBatch {
     public boolean maybeExpire(int requestTimeoutMs, long retryBackoffMs, long now, long lingerMs, boolean isFull) {
         boolean expire = false;
 
+        //不是重试，已经满了，超时时间已经小于append时间到现在
         if (!this.inRetry() && isFull && requestTimeoutMs < (now - this.lastAppendTime)) {
             expire = true;
+            //不是重试并且当前时间已经距离创建时间+最大停留时间大于超时时间
         } else if (!this.inRetry() && requestTimeoutMs < (now - (this.createdMs + lingerMs))) {
             expire = true;
+            //重试，但是当前时间减去（上次重试时间加上重试间隔）大于超时时间
         } else if (this.inRetry() && requestTimeoutMs < (now - (this.lastAttemptMs + retryBackoffMs))) {
             expire = true;
         }
 
         if (expire) {
+            //关闭
             this.records.close();
+            //超时异常
             this.done(-1L, Record.NO_TIMESTAMP, new TimeoutException("Batch containing " + recordCount + " record(s) expired due to timeout while requesting metadata from brokers for " + topicPartition));
         }
 
