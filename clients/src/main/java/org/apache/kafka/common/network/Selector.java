@@ -610,11 +610,13 @@ public class Selector implements Selectable {
      * checks if there are any staged receives and adds to completedReceives
      */
     private void addToCompletedReceives() {
+        //已经读取到了数据
         if (!this.stagedReceives.isEmpty()) {
             Iterator<Map.Entry<KafkaChannel, Deque<NetworkReceive>>> iterator = this.stagedReceives.entrySet().iterator();
             while (iterator.hasNext()) {
                 Map.Entry<KafkaChannel, Deque<NetworkReceive>> entry = iterator.next();
                 KafkaChannel channel = entry.getKey();
+                //遍历，将NetworkReceive添加到completeReceives中
                 if (!channel.isMute()) {
                     Deque<NetworkReceive> deque = entry.getValue();
                     NetworkReceive networkReceive = deque.poll();

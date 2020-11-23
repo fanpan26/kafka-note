@@ -270,6 +270,7 @@ public class NetworkClient implements KafkaClient {
     public List<ClientResponse> poll(long timeout, long now) {
         long metadataTimeout = metadataUpdater.maybeUpdate(now);
         try {
+            //拉取数据
             this.selector.poll(Utils.min(timeout, metadataTimeout, requestTimeoutMs));
         } catch (IOException e) {
             log.error("Unexpected error during I/O", e);
@@ -471,12 +472,17 @@ public class NetworkClient implements KafkaClient {
      * @param now The current time
      */
     private void handleCompletedReceives(List<ClientResponse> responses, long now) {
+        //遍历已经接收的NetworkReceives
         for (NetworkReceive receive : this.selector.completedReceives()) {
+            //NodeId
             String source = receive.source();
+            //一个请求对应一个响应
             ClientRequest req = inFlightRequests.completeNext(source);
+            //构造body
             Struct body = parseResponse(receive.payload(), req.request().header());
-            if (!metadataUpdater.maybeHandleCompletedReceive(req, now, body))
+            if (!metadataUpdater.maybeHandleCompletedReceive(req, now, body)) {
                 responses.add(new ClientResponse(req, now, false, body));
+            }
         }
     }
 

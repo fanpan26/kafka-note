@@ -48,7 +48,9 @@ public class NetworkReceive implements Receive {
 
     public NetworkReceive(int maxSize, String source) {
         this.source = source;
+        //存储4个字节的数据长度
         this.size = ByteBuffer.allocate(4);
+        //数据内容
         this.buffer = null;
         this.maxSize = maxSize;
     }
@@ -64,9 +66,11 @@ public class NetworkReceive implements Receive {
 
     @Override
     public boolean complete() {
+        //size已经读取完毕并且buffer也读取完毕
         return !size.hasRemaining() && !buffer.hasRemaining();
     }
 
+    @Override
     public long readFrom(ScatteringByteChannel channel) throws IOException {
         return readFromReadableChannel(channel);
     }
@@ -77,26 +81,39 @@ public class NetworkReceive implements Receive {
     @Deprecated
     public long readFromReadableChannel(ReadableByteChannel channel) throws IOException {
         int read = 0;
+        //说明size还没有读取完成，在拆包中或者第一次读取会命中该条件
         if (size.hasRemaining()) {
+            //从channel中读数据读到size中
             int bytesRead = channel.read(size);
-            if (bytesRead < 0)
+            if (bytesRead < 0) {
                 throw new EOFException();
+            }
+            //更新已读字节数
             read += bytesRead;
+            //如果size读满了，说明四个字节的数据长度已经读取完毕
             if (!size.hasRemaining()) {
+                //将buffer的position重置,以便于下次读取使用
                 size.rewind();
+                //接收字节数
                 int receiveSize = size.getInt();
-                if (receiveSize < 0)
+                if (receiveSize < 0) {
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + ")");
-                if (maxSize != UNLIMITED && receiveSize > maxSize)
+                }
+                //大于最大size数或者-1超出了范围
+                if (maxSize != UNLIMITED && receiveSize > maxSize) {
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + " larger than " + maxSize + ")");
-
+                }
+                //分配一个 size 字节的ByteBuffer，准备接收实际数据
                 this.buffer = ByteBuffer.allocate(receiveSize);
             }
         }
+        //如果buffer!=null说明已经接收到了size数或者上次未读取完整数据
         if (buffer != null) {
             int bytesRead = channel.read(buffer);
-            if (bytesRead < 0)
+            if (bytesRead < 0) {
                 throw new EOFException();
+            }
+            //更新已读字节数
             read += bytesRead;
         }
 

@@ -140,11 +140,13 @@ public class KafkaChannel {
         }
 
         receive(receive);
+        //如果已经读取完毕，将receive赋为null，如果没有传输完成，则等待下一次继续读取数据
         if (receive.complete()) {
             receive.payload().rewind();
             result = receive;
             receive = null;
         }
+        //只有读取完毕的时候，result不为null
         return result;
     }
 

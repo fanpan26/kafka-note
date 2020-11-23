@@ -129,8 +129,9 @@ public class RequestFuture<T> {
     }
 
     private void fireSuccess() {
-        for (RequestFutureListener<T> listener : listeners)
+        for (RequestFutureListener<T> listener : listeners) {
             listener.onSuccess(value);
+        }
     }
 
     private void fireFailure() {
