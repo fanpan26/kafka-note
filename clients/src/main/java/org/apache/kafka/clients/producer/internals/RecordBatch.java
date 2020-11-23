@@ -74,8 +74,9 @@ public final class RecordBatch {
                                                                    timestamp, checksum,
                                                                    key == null ? -1 : key.length,
                                                                    value == null ? -1 : value.length);
-            if (callback != null)
+            if (callback != null) {
                 thunks.add(new Thunk(callback, future));
+            }
             this.recordCount++;
             return future;
         }
@@ -143,12 +144,13 @@ public final class RecordBatch {
     public boolean maybeExpire(int requestTimeoutMs, long retryBackoffMs, long now, long lingerMs, boolean isFull) {
         boolean expire = false;
 
-        if (!this.inRetry() && isFull && requestTimeoutMs < (now - this.lastAppendTime))
+        if (!this.inRetry() && isFull && requestTimeoutMs < (now - this.lastAppendTime)) {
             expire = true;
-        else if (!this.inRetry() && requestTimeoutMs < (now - (this.createdMs + lingerMs)))
+        } else if (!this.inRetry() && requestTimeoutMs < (now - (this.createdMs + lingerMs))) {
             expire = true;
-        else if (this.inRetry() && requestTimeoutMs < (now - (this.lastAttemptMs + retryBackoffMs)))
+        } else if (this.inRetry() && requestTimeoutMs < (now - (this.lastAttemptMs + retryBackoffMs))) {
             expire = true;
+        }
 
         if (expire) {
             this.records.close();

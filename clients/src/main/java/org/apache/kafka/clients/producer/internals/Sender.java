@@ -264,14 +264,15 @@ public class Sender implements Runnable {
         int correlationId = response.request().request().header().correlationId();
         if (response.wasDisconnected()) {
             log.trace("Cancelled request {} due to node {} being disconnected", response, response.request()
-                                                                                                  .request()
-                                                                                                  .destination());
-            for (RecordBatch batch : batches.values())
+                    .request()
+                    .destination());
+            for (RecordBatch batch : batches.values()) {
                 completeBatch(batch, Errors.NETWORK_EXCEPTION, -1L, Record.NO_TIMESTAMP, correlationId, now);
+            }
         } else {
             log.trace("Received produce response from node {} with correlation id {}",
-                      response.request().request().destination(),
-                      correlationId);
+                    response.request().request().destination(),
+                    correlationId);
             // if we have a response, parse it
             if (response.hasResponse()) {
                 ProduceResponse produceResponse = new ProduceResponse(response.responseBody());
@@ -284,11 +285,12 @@ public class Sender implements Runnable {
                 }
                 this.sensors.recordLatency(response.request().request().destination(), response.requestLatencyMs());
                 this.sensors.recordThrottleTime(response.request().request().destination(),
-                                                produceResponse.getThrottleTime());
+                        produceResponse.getThrottleTime());
             } else {
-                // this is the acks = 0 case, just complete all requests
-                for (RecordBatch batch : batches.values())
+                // acks = 0 不需要等待服务响应，直接完成所有的请求
+                for (RecordBatch batch : batches.values()) {
                     completeBatch(batch, Errors.NONE, -1L, Record.NO_TIMESTAMP, correlationId, now);
+                }
             }
         }
     }
@@ -304,38 +306,46 @@ public class Sender implements Runnable {
      * @param now The current POSIX time stamp in milliseconds
      */
     private void completeBatch(RecordBatch batch, Errors error, long baseOffset, long timestamp, long correlationId, long now) {
+        //请求异常 并且可以重试
         if (error != Errors.NONE && canRetry(batch, error)) {
             // retry
             log.warn("Got error produce response with correlation id {} on topic-partition {}, retrying ({} attempts left). Error: {}",
-                     correlationId,
-                     batch.topicPartition,
-                     this.retries - batch.attempts - 1,
-                     error);
+                    correlationId,
+                    batch.topicPartition,
+                    this.retries - batch.attempts - 1,
+                    error);
+            //重新将消息入队，进行重试
             this.accumulator.reenqueue(batch, now);
             this.sensors.recordRetries(batch.topicPartition.topic(), batch.recordCount);
         } else {
             RuntimeException exception;
-            if (error == Errors.TOPIC_AUTHORIZATION_FAILED)
+            //Topic未授权
+            if (error == Errors.TOPIC_AUTHORIZATION_FAILED) {
                 exception = new TopicAuthorizationException(batch.topicPartition.topic());
-            else
+            } else {
                 exception = error.exception();
-            // tell the user the result of their request
+            }
+            // 回调给开发者消息发送结果
             batch.done(baseOffset, timestamp, exception);
             this.accumulator.deallocate(batch);
-            if (error != Errors.NONE)
+            if (error != Errors.NONE) {
                 this.sensors.recordErrors(batch.topicPartition.topic(), batch.recordCount);
+            }
         }
-        if (error.exception() instanceof InvalidMetadataException)
+        if (error.exception() instanceof InvalidMetadataException) {
             metadata.requestUpdate();
+        }
         // Unmute the completed partition.
-        if (guaranteeMessageOrder)
+        if (guaranteeMessageOrder) {
             this.accumulator.unmutePartition(batch.topicPartition);
+        }
     }
 
     /**
      * We can retry a send if the error is transient and the number of attempts taken is fewer than the maximum allowed
      */
     private boolean canRetry(RecordBatch batch, Errors error) {
+        //尝试重试的次数小于retries并且异常是 RetriableException，默认情况下 retries是0，不允许重试
         return batch.attempts < this.retries && error.exception() instanceof RetriableException;
     }
 

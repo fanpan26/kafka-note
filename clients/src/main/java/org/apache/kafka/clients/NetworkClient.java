@@ -301,6 +301,14 @@ public class NetworkClient implements KafkaClient {
             //如果有回调对象，则执行回调方法
             if (response.request().hasCallback()) {
                 try {
+                    /**
+                     *  RequestCompletionHandler callback = new RequestCompletionHandler() {
+                        @Override
+                        public void onComplete(ClientResponse response) {
+                            handleProduceResponse(response, recordsByPartition, time.milliseconds());
+                        }
+                    };
+                     * */
                     response.request().callback().onComplete(response);
                 } catch (Exception e) {
                     log.error("Uncaught error in request completion:", e);

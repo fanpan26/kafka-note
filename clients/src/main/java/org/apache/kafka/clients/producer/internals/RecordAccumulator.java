@@ -265,12 +265,17 @@ public final class RecordAccumulator {
      * Re-enqueue the given record batch in the accumulator to retry
      */
     public void reenqueue(RecordBatch batch, long now) {
+        //重试次数 +1
         batch.attempts++;
+        //上次重试时间
         batch.lastAttemptMs = now;
         batch.lastAppendTime = now;
+        //设置重试标志为true
         batch.setRetry();
+        //获取或者重新创建一个 Deque
         Deque<RecordBatch> deque = getOrCreateDeque(batch.topicPartition);
         synchronized (deque) {
+            //将batch添加到队伍头部，发送优先级最高
             deque.addFirst(batch);
         }
     }
