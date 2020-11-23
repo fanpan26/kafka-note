@@ -138,7 +138,9 @@ final class InFlightRequests {
         for (String nodeId : requests.keySet()) {
             if (inFlightRequestCount(nodeId) > 0) {
                 ClientRequest request = requests.get(nodeId).peekLast();
+                //当前时间减去发送时间是否大于超时时间
                 long timeSinceSend = now - request.sendTimeMs();
+                //如果超时了，将nodeId加入到nodeIds中
                 if (timeSinceSend > requestTimeout) {
                     nodeIds.add(nodeId);
                 }

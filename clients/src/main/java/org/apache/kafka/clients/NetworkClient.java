@@ -424,11 +424,13 @@ public class NetworkClient implements KafkaClient {
      * @param now The current time
      */
     private void processDisconnection(List<ClientResponse> responses, String nodeId, long now) {
+        //将状态设置为断开连接
         connectionStates.disconnected(nodeId, now);
         for (ClientRequest request : this.inFlightRequests.clearAll(nodeId)) {
             log.trace("Cancelled request {} due to node {} being disconnected", request, nodeId);
-            if (!metadataUpdater.maybeHandleDisconnection(request))
+            if (!metadataUpdater.maybeHandleDisconnection(request)) {
                 responses.add(new ClientResponse(request, now, true, null));
+            }
         }
     }
 
@@ -442,15 +444,16 @@ public class NetworkClient implements KafkaClient {
     private void handleTimedOutRequests(List<ClientResponse> responses, long now) {
         List<String> nodeIds = this.inFlightRequests.getNodesWithTimedOutRequests(now, this.requestTimeoutMs);
         for (String nodeId : nodeIds) {
-            // close connection to the node
+            //关闭连接
             this.selector.close(nodeId);
             log.debug("Disconnecting from node {} due to request timeout.", nodeId);
             processDisconnection(responses, nodeId, now);
         }
 
         // we disconnected, so we should probably refresh our metadata
-        if (nodeIds.size() > 0)
+        if (nodeIds.size() > 0) {
             metadataUpdater.requestUpdate();
+        }
     }
 
     /**
@@ -506,8 +509,9 @@ public class NetworkClient implements KafkaClient {
             processDisconnection(responses, node, now);
         }
         // we got a disconnect so we should probably refresh our metadata and see if that broker is dead
-        if (this.selector.disconnected().size() > 0)
+        if (this.selector.disconnected().size() > 0) {
             metadataUpdater.requestUpdate();
+        }
     }
 
     /**
@@ -633,6 +637,7 @@ public class NetworkClient implements KafkaClient {
 
         @Override
         public void requestUpdate() {
+            //重新拉取元数据
             this.metadata.requestUpdate();
         }
 
