@@ -230,8 +230,9 @@ public class ConsumerNetworkClient implements Closeable {
         checkDisconnects(now);
 
         // execute scheduled tasks
-        if (executeDelayedTasks)
+        if (executeDelayedTasks) {
             delayedTasks.poll(now);
+        }
 
         // try again to send requests since buffer space may have been
         // cleared or a connect finished in the poll
@@ -256,8 +257,9 @@ public class ConsumerNetworkClient implements Closeable {
      * @param node The node to await requests from
      */
     public void awaitPendingRequests(Node node) {
-        while (pendingRequestCount(node) > 0)
+        while (pendingRequestCount(node) > 0) {
             poll(retryBackoffMs);
+        }
     }
 
     /**
@@ -279,8 +281,9 @@ public class ConsumerNetworkClient implements Closeable {
      */
     public int pendingRequestCount() {
         int total = 0;
-        for (List<ClientRequest> requests: unsent.values())
+        for (List<ClientRequest> requests: unsent.values()) {
             total += requests.size();
+        }
         return total + client.inFlightRequestCount();
     }
 
@@ -319,11 +322,13 @@ public class ConsumerNetworkClient implements Closeable {
                             (RequestFutureCompletionHandler) request.callback();
                     handler.raise(new TimeoutException("Failed to send request after " + unsentExpiryMs + " ms."));
                     requestIterator.remove();
-                } else
+                } else {
                     break;
+                }
             }
-            if (requestEntry.getValue().isEmpty())
+            if (requestEntry.getValue().isEmpty()) {
                 iterator.remove();
+            }
         }
     }
 

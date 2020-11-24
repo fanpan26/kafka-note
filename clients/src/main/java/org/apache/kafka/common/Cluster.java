@@ -159,10 +159,11 @@ public final class Cluster {
      */
     public Node leaderFor(TopicPartition topicPartition) {
         PartitionInfo info = partitionsByTopicPartition.get(topicPartition);
-        if (info == null)
+        if (info == null) {
             return null;
-        else
+        } else {
             return info.leader();
+        }
     }
 
     /**
