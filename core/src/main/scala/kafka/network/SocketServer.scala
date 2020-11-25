@@ -92,9 +92,12 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
         for (i <- processorBeginIndex until processorEndIndex)
           processors(i) = newProcessor(i, connectionQuotas, protocol)
 
+        //初始化Acceptor，内部启动三个对应的Processor线程
+        //初始化Selector和ServerSocketChannel（9092端口）
         val acceptor = new Acceptor(endpoint, sendBufferSize, recvBufferSize, brokerId,
           processors.slice(processorBeginIndex, processorEndIndex), connectionQuotas)
         acceptors.put(endpoint, acceptor)
+        //启动acceptor线程，执行run方法
         Utils.newThread("kafka-socket-acceptor-%s-%d".format(protocol.toString, endpoint.port), acceptor, false).start()
         acceptor.awaitStartup()
 
@@ -237,10 +240,12 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                               processors: Array[Processor],
                               connectionQuotas: ConnectionQuotas) extends AbstractServerThread(connectionQuotas) with KafkaMetricsGroup {
 
+  //初始化Selector
   private val nioSelector = NSelector.open()
   val serverChannel = openServerSocket(endPoint.host, endPoint.port)
 
   this.synchronized {
+    //遍历processor，新开线程跑起来
     processors.foreach { processor =>
       Utils.newThread("kafka-network-thread-%d-%s-%d".format(brokerId, endPoint.protocolType.toString, processor.id), processor, false).start()
     }
@@ -250,6 +255,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
    * Accept loop that checks for new connection attempts
    */
   def run() {
+    //NIO 注册 OP_ACCEPT 事件
     serverChannel.register(nioSelector, SelectionKey.OP_ACCEPT)
     startupComplete()
     try {
@@ -294,24 +300,31 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
   }
 
   /*
+   * 创建ServerSocket
    * Create a server socket to listen for connections on.
    */
   private def openServerSocket(host: String, port: Int): ServerSocketChannel = {
+    // host  port
     val socketAddress =
       if(host == null || host.trim.isEmpty)
         new InetSocketAddress(port)
       else
         new InetSocketAddress(host, port)
+    //直接调用Open方法
     val serverChannel = ServerSocketChannel.open()
+    //非阻塞
     serverChannel.configureBlocking(false)
+    //设置接收Buffer大小
     serverChannel.socket().setReceiveBufferSize(recvBufferSize)
     try {
+      //绑定地址
       serverChannel.socket.bind(socketAddress)
       info("Awaiting socket connections on %s:%d.".format(socketAddress.getHostString, serverChannel.socket.getLocalPort))
     } catch {
       case e: SocketException =>
         throw new KafkaException("Socket server failed to bind to %s:%d: %s.".format(socketAddress.getHostString, port, e.getMessage), e)
     }
+    //返回SocketServerChannel
     serverChannel
   }
 
