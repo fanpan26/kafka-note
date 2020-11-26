@@ -100,7 +100,7 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
         //启动acceptor线程，执行run方法
         Utils.newThread("kafka-socket-acceptor-%s-%d".format(protocol.toString, endpoint.port), acceptor, false).start()
         acceptor.awaitStartup()
-
+        //等待Acceptor线程执行成功
         processorBeginIndex = processorEndIndex
       }
     }
@@ -187,6 +187,7 @@ private[kafka] abstract class AbstractServerThread(connectionQuotas: ConnectionQ
   def awaitStartup(): Unit = startupLatch.await
 
   /**
+    * 使用CountDownLatch做阻塞等待
    * Record that the thread startup is complete
    */
   protected def startupComplete() = {
@@ -242,11 +243,13 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
 
   //初始化Selector
   private val nioSelector = NSelector.open()
+  //打开ServerSocket
   val serverChannel = openServerSocket(endPoint.host, endPoint.port)
 
   this.synchronized {
     //遍历processor，新开线程跑起来
     processors.foreach { processor =>
+      //Processor start running~
       Utils.newThread("kafka-network-thread-%d-%s-%d".format(brokerId, endPoint.protocolType.toString, processor.id), processor, false).start()
     }
   }
@@ -306,7 +309,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
   private def openServerSocket(host: String, port: Int): ServerSocketChannel = {
     // host  port
     val socketAddress =
-      if(host == null || host.trim.isEmpty)
+      if (host == null || host.trim.isEmpty)
         new InetSocketAddress(port)
       else
         new InetSocketAddress(host, port)
