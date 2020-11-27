@@ -224,14 +224,19 @@ public class Selector implements Selectable {
     }
 
     /**
+     * 服务端和客户端都使用了这个方法
      * Register the nioSelector with an existing channel
      * Use this on server-side, when a connection is accepted by a different thread but processed by the Selector
      * Note that we are not checking if the connection id is valid - since the connection already exists
      */
     public void register(String id, SocketChannel socketChannel) throws ClosedChannelException {
+        //关注OP_READ事件
         SelectionKey key = socketChannel.register(nioSelector, SelectionKey.OP_READ);
+        //封装成为KafkaChannel
         KafkaChannel channel = channelBuilder.buildChannel(id, key, maxReceiveSize);
+        //将kafkaChannel赋值到attach
         key.attach(channel);
+        //添加到channels中
         this.channels.put(id, channel);
     }
 
@@ -240,6 +245,7 @@ public class Selector implements Selectable {
      */
     @Override
     public void wakeup() {
+        //唤醒nioSelector
         this.nioSelector.wakeup();
     }
 
@@ -314,12 +320,14 @@ public class Selector implements Selectable {
 
         /* check ready keys */
         long startSelect = time.nanoseconds();
+        //获取readyKeys
         int readyKeys = select(timeout);
         long endSelect = time.nanoseconds();
         currentTimeNanos = endSelect;
         this.sensors.selectTime.record(endSelect - startSelect, time.milliseconds());
 
         if (readyKeys > 0 || !immediatelyConnectedKeys.isEmpty()) {
+            //取出
             pollSelectionKeys(this.nioSelector.selectedKeys(), false);
             pollSelectionKeys(immediatelyConnectedKeys, true);
         }

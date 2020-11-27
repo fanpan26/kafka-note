@@ -84,10 +84,12 @@ public class KafkaChannel {
     }
 
     public void mute() {
+        //取消关注OP_READ事件
         transportLayer.removeInterestOps(SelectionKey.OP_READ);
     }
 
     public void unmute() {
+        //添加OP_READ
         transportLayer.addInterestOps(SelectionKey.OP_READ);
     }
 
