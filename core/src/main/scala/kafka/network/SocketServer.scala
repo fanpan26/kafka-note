@@ -513,6 +513,7 @@ private[kafka] class Processor(val id: Int,
   }
 
   private def processCompletedReceives() {
+    //遍历已经收到的请求
     selector.completedReceives.asScala.foreach { receive =>
       try {
         //拿到KafkaChannel
@@ -524,6 +525,7 @@ private[kafka] class Processor(val id: Int,
         val req = RequestChannel.Request(processor = id, connectionId = receive.source, session = session, buffer = receive.payload, startTimeMs = time.milliseconds, securityProtocol = protocol)
         //将req放到requestChannel，requestQueue队列中
         requestChannel.sendRequest(req)
+        //注销OP_READ读事件
         selector.mute(receive.source)
       } catch {
         case e @ (_: InvalidRequestException | _: SchemaException) =>

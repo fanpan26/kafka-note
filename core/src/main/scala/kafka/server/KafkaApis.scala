@@ -47,9 +47,10 @@ import scala.collection._
 import scala.collection.JavaConverters._
 import org.apache.kafka.common.requests.SaslHandshakeResponse
 
-/**
- * Logic to handle the various Kafka requests
- */
+ /**
+  * 封装了处理请求逻辑
+  * Logic to handle the various Kafka requests
+  */
 class KafkaApis(val requestChannel: RequestChannel,
                 val replicaManager: ReplicaManager,
                 val coordinator: GroupCoordinator,
@@ -65,9 +66,10 @@ class KafkaApis(val requestChannel: RequestChannel,
   // Store all the quota managers for each type of request
   val quotaManagers: Map[Short, ClientQuotaManager] = instantiateQuotaManagers(config)
 
-  /**
-   * Top-level method that handles all requests and multiplexes to the right api
-   */
+   /**
+    * 根据request.requestId去处理不同请求
+    * Top-level method that handles all requests and multiplexes to the right api
+    */
   def handle(request: RequestChannel.Request) {
     try {
       trace("Handling request:%s from connection %s;securityProtocol:%s,principal:%s".
