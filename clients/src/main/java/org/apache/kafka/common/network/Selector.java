@@ -274,6 +274,7 @@ public class Selector implements Selectable {
     public void send(Send send) {
         KafkaChannel channel = channelOrFail(send.destination());
         try {
+            //将消息设置到KafkaChannel中
             channel.setSend(send);
         } catch (CancelledKeyException e) {
             this.failedSends.add(send.destination());
@@ -400,12 +401,14 @@ public class Selector implements Selectable {
                 }
 
             } catch (Exception e) {
+                //出现异常
                 String desc = channel.socketDescription();
                 if (e instanceof IOException) {
                     log.debug("Connection with {} disconnected", desc, e);
                 } else {
                     log.warn("Unexpected error from {}; closing connection", desc, e);
                 }
+                //关闭连接
                 close(channel);
                 this.disconnected.add(channel.id());
             }
@@ -625,9 +628,12 @@ public class Selector implements Selectable {
                 Map.Entry<KafkaChannel, Deque<NetworkReceive>> entry = iterator.next();
                 KafkaChannel channel = entry.getKey();
                 //遍历，将NetworkReceive添加到completeReceives中
+                //!isMute 即在OP_READ 状态
+                // （注销OP_READ读事件）处理请求的过程中会执行 ：selector.mute(receive.source) 即取消OP_READ事件，所以下一次走到这里的话就不会执行add方法了。
                 if (!channel.isMute()) {
                     Deque<NetworkReceive> deque = entry.getValue();
                     NetworkReceive networkReceive = deque.poll();
+                    //只往里面放一个
                     this.completedReceives.add(networkReceive);
                     this.sensors.recordBytesReceived(channel.id(), networkReceive.payload().limit());
                     if (deque.isEmpty()) {

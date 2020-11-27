@@ -403,6 +403,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         case (topicPartition, buffer) => (topicPartition, new ByteBufferMessageSet(buffer))
       }
 
+      //调用ReplicaManager将消息写入到副本
       // call the replica manager to append messages to the replicas
       replicaManager.appendMessages(
         produceRequest.timeout.toLong,

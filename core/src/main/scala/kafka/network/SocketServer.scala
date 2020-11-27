@@ -496,7 +496,9 @@ private[kafka] class Processor(val id: Int,
       response.request.updateRequestMetrics()
     }
     else {
+      //发送消息
       selector.send(response.responseSend)
+      //添加到inflightResponses中
       inflightResponses += (response.request.connectionId -> response)
     }
   }
@@ -543,6 +545,7 @@ private[kafka] class Processor(val id: Int,
         throw new IllegalStateException(s"Send for ${send.destination} completed, but not in `inflightResponses`")
       }
       resp.request.updateRequestMetrics()
+      //添加OP_READ事件
       selector.unmute(send.destination)
     }
   }
