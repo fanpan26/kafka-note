@@ -50,11 +50,16 @@ import scala.util.control.{ControlThrowable, NonFatal}
  */
 class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time) extends Logging with KafkaMetricsGroup {
 
+  //节点信息
   private val endpoints = config.listeners
+  //processor线程数
   private val numProcessorThreads = config.numNetworkThreads
+  //请求处理队列容量
   private val maxQueuedRequests = config.queuedMaxRequests
+  //总processor线程数
   private val totalProcessorThreads = numProcessorThreads * endpoints.size
 
+  //每个IP可连接的最大客户端数
   private val maxConnectionsPerIp = config.maxConnectionsPerIp
   private val maxConnectionsPerIpOverrides = config.maxConnectionsPerIpOverrides
 
@@ -80,7 +85,9 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
 
       connectionQuotas = new ConnectionQuotas(maxConnectionsPerIp, maxConnectionsPerIpOverrides)
 
+      //发送Buffer大小
       val sendBufferSize = config.socketSendBufferBytes
+      //接收Buffer大小
       val recvBufferSize = config.socketReceiveBufferBytes
       val brokerId = config.brokerId
 
@@ -89,6 +96,7 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
         val protocol = endpoint.protocolType
         val processorEndIndex = processorBeginIndex + numProcessorThreads
 
+        //初始化processors
         for (i <- processorBeginIndex until processorEndIndex)
           processors(i) = newProcessor(i, connectionQuotas, protocol)
 

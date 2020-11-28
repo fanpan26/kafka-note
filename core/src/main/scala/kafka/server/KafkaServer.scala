@@ -161,16 +161,18 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
     try {
       info("starting")
 
+      //正在关闭中
       if(isShuttingDown.get)
         throw new IllegalStateException("Kafka server is still shutting down, cannot re-start!")
 
+      //已经启动成功
       if(startupComplete.get)
         return
-
+      //是否可以启动 false 改为 true
       val canStartup = isStartingUp.compareAndSet(false, true)
       if (canStartup) {
         metrics = new Metrics(metricConfig, reporters, kafkaMetricsTime, true)
-
+        //将brokerState设置为启动中
         brokerState.newState(Starting)
 
         /* start scheduler */
@@ -187,15 +189,16 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
         config.brokerId =  getBrokerId
         this.logIdent = "[Kafka Server " + config.brokerId + "], "
 
+        //启动网络服务
         socketServer = new SocketServer(config, metrics, kafkaMetricsTime)
         socketServer.startup()
 
-        /* start replica manager */
+        //启动分片管理器
         replicaManager = new ReplicaManager(config, metrics, time, kafkaMetricsTime, zkUtils, kafkaScheduler, logManager,
           isShuttingDown)
         replicaManager.startup()
 
-        /* start kafka controller */
+        //启动KafkaController
         kafkaController = new KafkaController(config, zkUtils, brokerState, kafkaMetricsTime, metrics, threadNamePrefix)
         kafkaController.startup()
 
