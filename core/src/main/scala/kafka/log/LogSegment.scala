@@ -78,7 +78,9 @@ class LogSegment(val log: FileMessageSet,
     if (messages.sizeInBytes > 0) {
       trace("Inserting %d bytes at offset %d at position %d".format(messages.sizeInBytes, offset, log.sizeInBytes()))
       // append an entry to the index (if needed)
-      if(bytesSinceLastIndexEntry > indexIntervalBytes) {
+      // bytesSinceLastIndexEntry 距离上次写索引的位置有多少字节了，如果写入的字节数大于 indexIntervalBytes ，则需要写一次索引，否则不用写。
+      //不是每一条数据都要写一个索引，而是多个字节之后才会写
+      if (bytesSinceLastIndexEntry > indexIntervalBytes) {
         index.append(offset, log.sizeInBytes())
         this.bytesSinceLastIndexEntry = 0
       }

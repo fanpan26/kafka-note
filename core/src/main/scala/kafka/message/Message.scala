@@ -48,7 +48,6 @@ object Message {
   val KeyOffset_V0 = KeySizeOffset_V0 + KeySizeLength
   val KeyOffset_V1 = KeySizeOffset_V1 + KeySizeLength
   val ValueSizeLength = 4
-
   private val MessageHeaderSizeMap = Map (
     (0: Byte) -> (CrcLength + MagicLength + AttributesLength + KeySizeLength + ValueSizeLength),
     (1: Byte) -> (CrcLength + MagicLength + AttributesLength + TimestampLength + KeySizeLength + ValueSizeLength))

@@ -36,9 +36,10 @@ import scala.collection.JavaConverters._
 import com.yammer.metrics.core.Gauge
 import org.apache.kafka.common.requests.PartitionState
 
-/**
- * Data structure that represents a topic partition. The leader maintains the AR, ISR, CUR, RAR
- */
+ /**
+  * Partition主体结构信息
+  * Data structure that represents a topic partition. The leader maintains the AR, ISR, CUR, RAR
+  */
 class Partition(val topic: String,
                 val partitionId: Int,
                 time: Time,
@@ -422,22 +423,31 @@ class Partition(val topic: String,
 
     laggingReplicas
   }
-
+   /**
+     * 将消息写入
+     * */
   def appendMessagesToLeader(messages: ByteBufferMessageSet, requiredAcks: Int = 0) = {
+    //读写锁，获取到ReadLock之后执行 fun
     val (info, leaderHWIncremented) = inReadLock(leaderIsrUpdateLock) {
+      //获取锁成功继续执行
       val leaderReplicaOpt = leaderReplicaIfLocal()
       leaderReplicaOpt match {
+          //当前这个partition在本地是不是leader
         case Some(leaderReplica) =>
           val log = leaderReplica.log.get
+          //ISR列表中至少有几个副本，必须有leader
           val minIsr = log.config.minInSyncReplicas
+          //
           val inSyncSize = inSyncReplicas.size
 
+          //校验ISR个数
           // Avoid writing to leader if there are not enough insync replicas to make it safe
           if (inSyncSize < minIsr && requiredAcks == -1) {
             throw new NotEnoughReplicasException("Number of insync replicas for partition [%s,%d] is [%d], below required minimum [%d]"
               .format(topic, partitionId, inSyncSize, minIsr))
           }
 
+          //将日志写入
           val info = log.append(messages, assignOffsets = true)
           // probably unblock some follower fetch requests since log end offset has been updated
           replicaManager.tryCompleteDelayedFetch(new TopicPartitionOperationKey(this.topic, this.partitionId))
@@ -445,6 +455,7 @@ class Partition(val topic: String,
           (info, maybeIncrementLeaderHW(leaderReplica))
 
         case None =>
+          //不是leader的话，就抛出异常，应该写入消息到leader
           throw new NotLeaderForPartitionException("Leader not local for partition [%s,%d] on broker %d"
             .format(topic, partitionId, localBrokerId))
       }

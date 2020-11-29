@@ -71,7 +71,9 @@ class OffsetIndex(@volatile private[this] var _file: File, val baseOffset: Long,
       }
 
       /* memory-map the file */
+      //文件大小
       val len = raf.length()
+      //map到FileChannel
       val idx = raf.getChannel.map(FileChannel.MapMode.READ_WRITE, 0, len)
 
       /* set the position in the index for the next entry */
@@ -205,12 +207,20 @@ class OffsetIndex(@volatile private[this] var _file: File, val baseOffset: Long,
   def append(offset: Long, position: Int) {
     inLock(lock) {
       require(!isFull, "Attempt to append to a full index (size = " + _entries + ").")
+      //大于上一次的offset才会写
       if (_entries == 0 || offset > _lastOffset) {
         debug("Adding index entry %d => %d to %s.".format(offset, position, _file.getName))
+        //写入的是内存，当前消息距离此索引的第一条消息间隔多少offset，并且他所在的位置是 position 4 个字节
+        /**
+          *  offset=23332  position=220
+          *  offset=23756 position=248
+          * */
         mmap.putInt((offset - baseOffset).toInt)
+        //写入position  4个字节
         mmap.putInt(position)
         _entries += 1
         _lastOffset = offset
+        //每写一次都是8个字节，所以，当前的 mmap.position 肯定是8的倍数，并且和_entries对应
         require(_entries * 8 == mmap.position, _entries + " entries but file position in index is " + mmap.position + ".")
       } else {
         throw new InvalidOffsetException("Attempt to append an offset (%d) to position %d no larger than the last offset appended (%d) to %s."
