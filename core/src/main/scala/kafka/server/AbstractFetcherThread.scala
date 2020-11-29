@@ -86,6 +86,7 @@ abstract class AbstractFetcherThread(name: String,
   override def doWork() {
 
     val fetchRequest = inLock(partitionMapLock) {
+      //构建fetchRequest
       val fetchRequest = buildFetchRequest(partitionMap)
       if (fetchRequest.isEmpty) {
         trace("There are no active partitions. Back off for %d ms before sending a fetch request".format(fetchBackOffMs))
@@ -94,6 +95,7 @@ abstract class AbstractFetcherThread(name: String,
       fetchRequest
     }
 
+    //如果fetchRequest非空，则执行
     if (!fetchRequest.isEmpty)
       processFetchRequest(fetchRequest)
   }
@@ -104,6 +106,7 @@ abstract class AbstractFetcherThread(name: String,
 
     try {
       trace("Issuing to broker %d of fetch request %s".format(sourceBroker.id, fetchRequest))
+      //发送fetch请求，获取到fetch结果
       responseData = fetch(fetchRequest)
     } catch {
       case t: Throwable =>
@@ -121,7 +124,7 @@ abstract class AbstractFetcherThread(name: String,
     if (responseData.nonEmpty) {
       // process fetched data
       inLock(partitionMapLock) {
-
+        //处理fetch结果，遍历数据
         responseData.foreach { case (topicAndPartition, partitionData) =>
           val TopicAndPartition(topic, partitionId) = topicAndPartition
           partitionMap.get(topicAndPartition).foreach(currentPartitionFetchState =>
@@ -130,12 +133,15 @@ abstract class AbstractFetcherThread(name: String,
               Errors.forCode(partitionData.errorCode) match {
                 case Errors.NONE =>
                   try {
+                    //获取拿到的数据
                     val messages = partitionData.toByteBufferMessageSet
                     val validBytes = messages.validBytes
+                    //最大的offset
                     val newOffset = messages.shallowIterator.toSeq.lastOption match {
                       case Some(m: MessageAndOffset) => m.nextOffset
                       case None => currentPartitionFetchState.offset
                     }
+                    //更新状态
                     partitionMap.put(topicAndPartition, new PartitionFetchState(newOffset))
                     fetcherLagStats.getAndMaybePut(topic, partitionId).lag = Math.max(0L, partitionData.highWatermark - newOffset)
                     fetcherStats.byteRate.mark(validBytes)

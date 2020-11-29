@@ -122,8 +122,10 @@ class ReplicaManager(val config: KafkaConfig,
     new Partition(t, p, time, this)
   })
   private val replicaStateChangeLock = new Object
-  //副本拉取和同步
+
+  //负责拉取副本的组件
   val replicaFetcherManager = new ReplicaFetcherManager(config, this, metrics, jTime, threadNamePrefix)
+
   //HW检查点的线程是否启动
   //消费者只能读取到HW高水位以下的消息
   private val highWatermarkCheckPointThreadStarted = new AtomicBoolean(false)
@@ -489,15 +491,17 @@ class ReplicaManager(val config: KafkaConfig,
                     fetchMinBytes: Int,
                     fetchInfo: immutable.Map[TopicAndPartition, PartitionFetchInfo],
                     responseCallback: Map[TopicAndPartition, FetchResponsePartitionData] => Unit) {
+    //是否从follower发送过来的请求
     val isFromFollower = replicaId >= 0
     val fetchOnlyFromLeader: Boolean = replicaId != Request.DebuggingConsumerId
     val fetchOnlyCommitted: Boolean = ! Request.isValidBrokerId(replicaId)
 
-    // read from local logs
+    // 从本地磁盘读取数据，需要使用.index文件查询offset数据
     val logReadResults = readFromLocalLog(fetchOnlyFromLeader, fetchOnlyCommitted, fetchInfo)
 
     // if the fetch comes from the follower,
     // update its corresponding log end offset
+    //如果fetch请求是来自其他follower
     if(Request.isValidBrokerId(replicaId))
       updateFollowerLogReadResults(replicaId, logReadResults)
 
@@ -549,6 +553,7 @@ class ReplicaManager(val config: KafkaConfig,
 
           // decide whether to only fetch from leader
           val localReplica = if (fetchOnlyFromLeader)
+            //从
             getLeaderReplicaIfLocal(topic, partition)
           else
             getReplicaOrException(topic, partition)
@@ -568,6 +573,7 @@ class ReplicaManager(val config: KafkaConfig,
           val initialLogEndOffset = localReplica.logEndOffset
           val logReadInfo = localReplica.log match {
             case Some(log) =>
+              //读取
               log.read(offset, fetchSize, maxOffsetOpt)
             case None =>
               error("Leader for partition [%s,%d] does not have a local log".format(topic, partition))
@@ -764,12 +770,19 @@ class ReplicaManager(val config: KafkaConfig,
   /*
    * Make the current broker to become follower for a given set of partitions by:
    *
+   * 如果一个Broker感知到自己被分配了follower分区之后，会调用这个方法，让自己变成follower
    * 1. Remove these partitions from the leader partitions set.
+   * 从leader partitions 中移除
    * 2. Mark the replicas as followers so that no more data can be added from the producer clients.
+   * 将副本标注为follower，producer不会向follower生产数据
    * 3. Stop fetchers for these partitions so that no more data can be added by the replica fetcher threads.
+   * 停止fetcher线程，暂停拉取数据
    * 4. Truncate the log and checkpoint offsets for these partitions.
+   * 记录分区的offset
    * 5. Clear the produce and fetch requests in the purgatory
+   * 清理掉延迟调度请求
    * 6. If the broker is not shutting down, add the fetcher to the new leaders.
+   * 对新的leader添加新的fetcher
    *
    * The ordering of doing these steps make sure that the replicas in transition will not
    * take any more messages before checkpointing offsets so that all messages before the checkpoint
@@ -779,6 +792,7 @@ class ReplicaManager(val config: KafkaConfig,
    * the error message will be set on each partition since we do not know which partition caused it. Otherwise,
    * return the set of partitions that are made follower due to this method
    */
+  //让当前的broker变成follower
   private def makeFollowers(controllerId: Int,
                             epoch: Int,
                             partitionState: Map[Partition, PartitionState],

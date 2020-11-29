@@ -509,6 +509,7 @@ class Log(val dir: File,
     if(startOffset == next)
       return FetchDataInfo(currentNextOffsetMetadata, MessageSet.Empty)
 
+    //根据offset找到从哪个segment开始读
     var entry = segments.floorEntry(startOffset)
 
     // attempt to read beyond the log end offset is an error
@@ -518,6 +519,7 @@ class Log(val dir: File,
     // Do the read on the segment with a base offset less than the target offset
     // but if that segment doesn't contain any messages with an offset greater than that
     // continue to read from successive segments until we get some messages or we reach the end of the log
+    //遍历，开始读取数据
     while(entry != null) {
       // If the fetch occurs on the active segment, there might be a race condition where two fetch requests occur after
       // the message is appended but before the nextOffsetMetadata is updated. In that case the second fetch may

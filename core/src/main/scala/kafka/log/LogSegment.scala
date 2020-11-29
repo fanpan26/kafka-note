@@ -104,6 +104,7 @@ class LogSegment(val log: FileMessageSet,
    */
   @threadsafe
   private[log] def translateOffset(offset: Long, startingFilePosition: Int = 0): OffsetPosition = {
+   //二分查找找到记录
     val mapping = index.lookup(offset)
     log.searchFor(offset, max(mapping.position, startingFilePosition))
   }
@@ -126,6 +127,7 @@ class LogSegment(val log: FileMessageSet,
       throw new IllegalArgumentException("Invalid max size for log read (%d)".format(maxSize))
 
     val logSize = log.sizeInBytes // this may change, need to save a consistent copy
+    //根据offset找到开始的物理位置
     val startPosition = translateOffset(startOffset)
 
     // if the start position is already off the end of the log, return null

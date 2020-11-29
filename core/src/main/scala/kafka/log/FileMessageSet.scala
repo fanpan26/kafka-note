@@ -138,8 +138,10 @@ class FileMessageSet private[kafka](@volatile var file: File,
                                         .format(targetOffset, startingPosition, file.getAbsolutePath))
       buffer.rewind()
       val offset = buffer.getLong()
+      //找到offset>=目标offset，则返回
       if(offset >= targetOffset)
         return OffsetPosition(offset, position)
+      //如果没找到，则继续找
       val messageSize = buffer.getInt()
       if(messageSize < Message.MinMessageOverhead)
         throw new IllegalStateException("Invalid message size: " + messageSize)

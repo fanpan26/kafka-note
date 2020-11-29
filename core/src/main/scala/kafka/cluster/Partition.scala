@@ -231,15 +231,18 @@ class Partition(val topic: String,
     }
   }
 
-  /**
-   * Update the log end offset of a certain replica of this partition
-   */
+   /**
+    * 更新follower的LEO，当Leader知道了follower的LEO之后，就可以更新Leader的HW了。
+    * Update the log end offset of a certain replica of this partition
+    */
   def updateReplicaLogReadResult(replicaId: Int, logReadResult: LogReadResult) {
     getReplica(replicaId) match {
       case Some(replica) =>
+        //此处的replica为follower的replicaId，更新leader维护的follower的LEO
         replica.updateLogReadResult(logReadResult)
         // check if we need to expand ISR to include this replica
         // if it is not in the ISR yet
+        //检查这个replicaId是否要加入到ISR列表
         maybeExpandIsr(replicaId)
 
         debug("Recorded replica %d log end offset (LEO) position %d for partition %s."

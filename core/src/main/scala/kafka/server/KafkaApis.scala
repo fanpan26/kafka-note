@@ -473,7 +473,9 @@ class KafkaApis(val requestChannel: RequestChannel,
       def fetchResponseCallback(delayTimeMs: Int) {
         trace(s"Sending fetch response to client ${fetchRequest.clientId} of " +
           s"${convertedPartitionData.values.map(_.messages.sizeInBytes).sum} bytes")
+        //获取到FetchResponse
         val response = FetchResponse(fetchRequest.correlationId, mergedPartitionData, fetchRequest.versionId, delayTimeMs)
+        //发送响应
         requestChannel.sendResponse(new RequestChannel.Response(request, new FetchResponseSend(request.connectionId, response)))
       }
 
