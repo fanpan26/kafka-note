@@ -956,19 +956,22 @@ object Log {
 
 
   /**
-   * Parse the topic and partition out of the directory name of a log
-   */
+    * 解析文件  topic-partitionId
+    * Parse the topic and partition out of the directory name of a log
+    */
   def parseTopicPartitionName(dir: File): TopicAndPartition = {
     val name: String = dir.getName
     if (name == null || name.isEmpty || !name.contains('-')) {
       throwException(dir)
     }
+    //topic-partitionId
     val index = name.lastIndexOf('-')
     val topic: String = name.substring(0, index)
     val partition: String = name.substring(index + 1)
     if (topic.length < 1 || partition.length < 1) {
       throwException(dir)
     }
+    //解析文件之后，返回TopicAndPartition对象
     TopicAndPartition(topic, partition.toInt)
   }
 

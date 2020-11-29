@@ -36,6 +36,14 @@ import java.util.concurrent.{ExecutionException, ExecutorService, Executors, Fut
  * size or I/O rate.
  * 
  * A background thread handles log retention by periodically truncating excess log segments.
+  * *kafka日志管理子系统的入口点。日志管理器负责日志的创建、检索和清理。所有读写操作都委托给各个日志实例。
+  * 日志管理器在一个或多个目录中维护日志。在数据目录中创建新日志用最少的日志。
+  * 不尝试在事实之后移动分区或基于日志大小或I/O速率
+  * 后台线程通过定期截断多余的日志段来处理日志保留。
+  *
+  * 顺序写、OS Cache、定时OS Cache flush
+  *
+  * logCleaner 定时删除磁盘文件
  */
 @threadsafe
 class LogManager(val logDirs: Array[File],
@@ -55,9 +63,14 @@ class LogManager(val logDirs: Array[File],
   private val logCreationOrDeletionLock = new Object
   private val logs = new Pool[TopicAndPartition, Log]()
 
+  //创建日志目录
   createAndValidateLogDirs(logDirs)
   private val dirLocks = lockLogDirs(logDirs)
   private val recoveryPointCheckpoints = logDirs.map(dir => (dir, new OffsetCheckpoint(new File(dir, RecoveryPointCheckpointFile)))).toMap
+
+  //扫描哦配置的logDir下的目录和文件
+  //根据目录和文件格式，加载出当前自己本地存储了哪些分区的log
+  //把每个Log的信息实例化成对象
   loadLogs()
 
   // public, so we can access this from kafka.admin.DeleteTopicTest
@@ -109,13 +122,16 @@ class LogManager(val logDirs: Array[File],
   private def loadLogs(): Unit = {
     info("Loading logs.")
 
+    //线程池，多线程扫描
     val threadPools = mutable.ArrayBuffer.empty[ExecutorService]
     val jobs = mutable.Map.empty[File, Seq[Future[_]]]
 
+    //每个dir对应一个线程池
     for (dir <- this.logDirs) {
       val pool = Executors.newFixedThreadPool(ioThreads)
       threadPools.append(pool)
 
+      //.kafka_cleanshutdown
       val cleanShutdownFile = new File(dir, Log.CleanShutdownFile)
 
       if (cleanShutdownFile.exists) {
@@ -145,13 +161,17 @@ class LogManager(val logDirs: Array[File],
         CoreUtils.runnable {
           debug("Loading log '" + logDir.getName + "'")
 
+          //获取到TopicPartition
           val topicPartition = Log.parseTopicPartitionName(logDir)
+          //获取配置
           val config = topicConfigs.getOrElse(topicPartition.topic, defaultConfig)
           val logRecoveryPoint = recoveryPoints.getOrElse(topicPartition, 0L)
-
+          //生成Log对象
           val current = new Log(logDir, config, logRecoveryPoint, scheduler, time)
+          //放入logs
           val previous = this.logs.put(topicPartition, current)
 
+          //如果之前已经存在该文件了，说明重复加载了
           if (previous != null) {
             throw new IllegalArgumentException(
               "Duplicate log directories found: %s, %s!".format(
@@ -194,11 +214,14 @@ class LogManager(val logDirs: Array[File],
                          period = retentionCheckMs, 
                          TimeUnit.MILLISECONDS)
       info("Starting log flusher with a default period of %d ms.".format(flushCheckMs))
+      //刷新到磁盘
       scheduler.schedule("kafka-log-flusher", 
                          flushDirtyLogs, 
                          delay = InitialTaskDelayMs, 
                          period = flushCheckMs, 
                          TimeUnit.MILLISECONDS)
+
+      //覆盖checkpoint
       scheduler.schedule("kafka-recovery-point-checkpoint",
                          checkpointRecoveryPointOffsets,
                          delay = InitialTaskDelayMs,
