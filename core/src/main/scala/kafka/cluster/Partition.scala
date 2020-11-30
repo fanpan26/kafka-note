@@ -99,6 +99,7 @@ class Partition(val topic: String,
             info("No checkpointed highwatermark is found for partition [%s,%d]".format(topic, partitionId))
           val offset = offsetMap.getOrElse(TopicAndPartition(topic, partitionId), 0L).min(log.logEndOffset)
           val localReplica = new Replica(replicaId, this, time, offset, Some(log))
+          //将replica加入到集合中
           addReplicaIfNotExists(localReplica)
         } else {
           val remoteReplica = new Replica(replicaId, this, time)
@@ -272,9 +273,11 @@ class Partition(val topic: String,
         case Some(leaderReplica) =>
           val replica = getReplica(replicaId).get
           val leaderHW = leaderReplica.highWatermark
+          //如果ISR列表不包含 replica，并且 replica的LEO已经大于等于了Leader的HW，那么该副本可以重新回到ISR列表中
           if(!inSyncReplicas.contains(replica) &&
              assignedReplicas.map(_.brokerId).contains(replicaId) &&
                   replica.logEndOffset.offsetDiff(leaderHW) >= 0) {
+            //新的ISR列表等于老的加 replica
             val newInSyncReplicas = inSyncReplicas + replica
             info("Expanding ISR for partition [%s,%d] from %s to %s"
                          .format(topic, partitionId, inSyncReplicas.map(_.brokerId).mkString(","),
@@ -353,10 +356,16 @@ class Partition(val topic: String,
    * since all callers of this private API acquire that lock
    */
   private def maybeIncrementLeaderHW(leaderReplica: Replica): Boolean = {
+    //获取所有副本的LEO
     val allLogEndOffsets = inSyncReplicas.map(_.logEndOffset)
+    //找出最小的LEO，为新的HW
     val newHighWatermark = allLogEndOffsets.min(new LogOffsetMetadata.OffsetOrdering)
+    //旧的HW
     val oldHighWatermark = leaderReplica.highWatermark
+
+    //如果旧的HW小于新的HW，或者旧的HW在旧的segment上
     if (oldHighWatermark.messageOffset < newHighWatermark.messageOffset || oldHighWatermark.onOlderSegment(newHighWatermark)) {
+      //更新HW
       leaderReplica.highWatermark = newHighWatermark
       debug("High watermark for partition [%s,%d] updated to %s".format(topic, partitionId, newHighWatermark))
       true
@@ -377,19 +386,22 @@ class Partition(val topic: String,
   }
 
   def maybeShrinkIsr(replicaMaxLagTimeMs: Long) {
+    //上锁
     val leaderHWIncremented = inWriteLock(leaderIsrUpdateLock) {
+
       leaderReplicaIfLocal() match {
         case Some(leaderReplica) =>
           val outOfSyncReplicas = getOutOfSyncReplicas(leaderReplica, replicaMaxLagTimeMs)
+
+          //如果有需要移除的副本机器
           if(outOfSyncReplicas.size > 0) {
             val newInSyncReplicas = inSyncReplicas -- outOfSyncReplicas
             assert(newInSyncReplicas.size > 0)
             info("Shrinking ISR for partition [%s,%d] from %s to %s".format(topic, partitionId,
               inSyncReplicas.map(_.brokerId).mkString(","), newInSyncReplicas.map(_.brokerId).mkString(",")))
-            // update ISR in zk and in cache
+            // 更新ISR和缓存
             updateIsr(newInSyncReplicas)
             // we may need to increment high watermark since ISR could be down to 1
-
             replicaManager.isrShrinkRate.mark()
             maybeIncrementLeaderHW(leaderReplica)
           } else {
@@ -408,8 +420,10 @@ class Partition(val topic: String,
   def getOutOfSyncReplicas(leaderReplica: Replica, maxLagMs: Long): Set[Replica] = {
     /**
      * there are two cases that will be handled here -
+      * LEO一直没有更新maxLagMs，从ISR列表中移除
      * 1. Stuck followers: If the leo of the replica hasn't been updated for maxLagMs ms,
      *                     the follower is stuck and should be removed from the ISR
+      * maxLagMs一直没有跟进最新的LEO，follower太慢了，需要从ISR列表移除
      * 2. Slow followers: If the replica has not read up to the leo within the last maxLagMs ms,
      *                    then the follower is lagging and should be removed from the ISR
      * Both these cases are handled by checking the lastCaughtUpTimeMs which represents
@@ -417,13 +431,18 @@ class Partition(val topic: String,
      * is violated, that replica is considered to be out of sync
      *
      **/
+
+      //leader的LEO
     val leaderLogEndOffset = leaderReplica.logEndOffset
+    //先把leader去掉
     val candidateReplicas = inSyncReplicas - leaderReplica
 
+    //筛选出所有上次时间到现在的时间已经超过maxLagMs
     val laggingReplicas = candidateReplicas.filter(r => (time.milliseconds - r.lastCaughtUpTimeMs) > maxLagMs)
     if(laggingReplicas.size > 0)
       debug("Lagging replicas for partition %s are %s".format(TopicAndPartition(topic, partitionId), laggingReplicas.map(_.brokerId).mkString(",")))
 
+    //返回超过时间的集合
     laggingReplicas
   }
    /**
